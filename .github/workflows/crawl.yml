@@ -24,6 +24,11 @@ jobs:
     timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
+      - name: Delete batch branches already fetched
+        run: |
+          for b in $(cat fetched.txt 2>/dev/null); do
+            git push -q "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete "$b" 2>/dev/null && echo "deleted $b" || true
+          done
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
