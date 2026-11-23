@@ -14,6 +14,10 @@ on:
         default: false
 permissions:
   contents: write
+  actions: write
+concurrency:
+  group: crawl
+  cancel-in-progress: false
 jobs:
   crawl:
     runs-on: ubuntu-latest
@@ -61,3 +65,15 @@ jobs:
           git config user.name "crawler"; git config user.email "crawler@users.noreply.github.com"
           git add -A && git commit -q -m "Batch ${{ github.run_number }}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "batch-${{ github.run_number }}"
+      - name: Start the next batch
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BATCH: ${{ inputs.batch_pages }}
+          EXTRA: ${{ inputs.extra }}
+        run: |
+          NEXT=$(python3 -c "import json;s=json.load(open('out/status.json'));print('yes' if (not s['finished'] and s['pages_this_run']>0) else 'no')" 2>/dev/null || echo no)
+          echo "next: $NEXT"
+          if [ "$NEXT" = yes ]; then
+            gh workflow run crawl.yml -R "${{ github.repository }}" --ref main -f batch_pages="$BATCH" -f extra="$EXTRA" -f fresh=false
+          fi
