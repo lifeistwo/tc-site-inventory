@@ -364,6 +364,13 @@ class Crawler:
             if not self.a.no_sitemap:
                 self.sitemapped.add(self.main_host)
                 await self.add_sitemap(dctx.request, self.base)
+            if self.a.recapture and os.path.exists(self.a.recapture):
+                for u in open(self.a.recapture).read().split():
+                    n = norm(u)
+                    if n:
+                        self.done.pop(n, None)
+                        self.seen.discard(n)
+                        self.enqueue(n)
             for r in list(self.done.values()):        # re-queue links found before a stop
                 self.seen.add(r["url"])
                 if not r.get("left_scope", r.get("left_main_site")):
@@ -546,6 +553,7 @@ def main():
     ap.add_argument("--chrome", action="store_true", help="use your installed Google Chrome instead of Playwright's Chromium")
     ap.add_argument("--batch-pages", type=int, default=0, help="stop after this many new pages (0 = no limit)")
     ap.add_argument("--time-limit", type=int, default=0, help="stop after this many minutes (0 = no limit)")
+    ap.add_argument("--recapture", default="", help="file of URLs to capture again even if already done")
     ap.add_argument("--report-only", action="store_true", help="rebuild the HTML and CSVs from the last run, no crawling")
     ap.add_argument("--fresh", action="store_true", help="ignore the earlier run and start again")
     a = ap.parse_args()
