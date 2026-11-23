@@ -12,6 +12,8 @@ on:
         description: "Start again (ignore saved progress)"
         type: boolean
         default: false
+permissions:
+  contents: write
 jobs:
   crawl:
     runs-on: ubuntu-latest
@@ -51,11 +53,11 @@ jobs:
         with:
           path: state
           key: state-${{ github.run_id }}
-      - name: Upload batch
+      - name: Push batch to its own branch
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: batch-${{ github.run_number }}
-          path: out/
-          retention-days: 3
-          compression-level: 0
+        run: |
+          cd out
+          git init -q -b "batch-${{ github.run_number }}"
+          git config user.name "crawler"; git config user.email "crawler@users.noreply.github.com"
+          git add -A && git commit -q -m "Batch ${{ github.run_number }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "batch-${{ github.run_number }}"
