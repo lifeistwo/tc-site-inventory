@@ -66,6 +66,8 @@ jobs:
         if: always()
         run: |
           cd out
+          for f in pages.jsonl links.csv inventory.csv; do [ -f "$f" ] && gzip -f "$f"; done
+          find . -type f -size +95M -print -delete
           git init -q -b "batch-${{ github.run_number }}"
           git config user.name "crawler"; git config user.email "crawler@users.noreply.github.com"
           git add -A && git commit -q -m "Batch ${{ github.run_number }}"
@@ -79,6 +81,7 @@ jobs:
         run: |
           NEXT=$(python3 -c "import json;s=json.load(open('out/status.json'));print('yes' if (not s['finished'] and s['pages_this_run']>0) else 'no')" 2>/dev/null || echo no)
           echo "next: $NEXT"
+          EXTRA=$(echo "$EXTRA" | sed -E 's/--recapture +[^ ]+//')
           if [ "$NEXT" = yes ]; then
             gh workflow run crawl.yml -R "${{ github.repository }}" --ref main -f batch_pages="$BATCH" -f extra="$EXTRA" -f fresh=false
           fi
