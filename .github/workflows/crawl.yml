@@ -1,0 +1,61 @@
+name: crawl
+on:
+  workflow_dispatch:
+    inputs:
+      batch_pages:
+        description: "Pages per run"
+        default: "400"
+      extra:
+        description: "Extra options for the script"
+        default: ""
+      fresh:
+        description: "Start again (ignore saved progress)"
+        type: boolean
+        default: false
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: pip install playwright && python -m playwright install --with-deps chromium
+      - name: Restore progress
+        if: ${{ !inputs.fresh }}
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+      - name: Reachability check
+        run: |
+          curl -s -o /dev/null -w "www: %{http_code}\n" -m 30 -A "Mozilla/5.0 (Macintosh) Chrome/131" https://www.tatacapital.com/ || echo "www: unreachable"
+      - name: Crawl
+        env:
+          BATCH: ${{ inputs.batch_pages }}
+          EXTRA: ${{ inputs.extra }}
+        run: |
+          mkdir -p state out
+          cp state/pages.jsonl out/ 2>/dev/null || true
+          cp state/sitemap_urls.txt out/ 2>/dev/null || true
+          python tc_site_inventory.py --out out --batch-pages "$BATCH" --time-limit 300 $EXTRA || true
+          cp out/pages.jsonl state/ 2>/dev/null || true
+          cp out/sitemap_urls.txt state/ 2>/dev/null || true
+          cat out/status.json || true
+      - name: Save progress
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+      - name: Upload batch
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-${{ github.run_number }}
+          path: out/
+          retention-days: 3
+          compression-level: 0
